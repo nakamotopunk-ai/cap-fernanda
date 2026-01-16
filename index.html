@@ -21,7 +21,7 @@
 
         <div class="px-6 pb-10">
             <div class="text-center mb-4">
-                <h1 class="text-xl font-black text-slate-800 uppercase tracking-tighter">Lic. María Fernanda Ibarra Mora</h1>
+                <h1 class="text-xl font-black text-slate-800 uppercase tracking-tighter leading-tight">Lic. María Fernanda Ibarra Mora</h1>
                 <p class="text-[9px] text-slate-400 font-bold uppercase tracking-[0.3em]">Licenciada en Psicología</p>
             </div>
 
@@ -44,12 +44,12 @@
                 </div>
 
                 <div id="payment-area" class="hidden animate-in fade-in duration-500 space-y-2 mt-4">
-                    <div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl text-center">
+                    <div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl text-center shadow-sm">
                         <p class="text-[11px] text-blue-700 font-black uppercase tracking-tighter">MERCADO PAGO</p>
                         <p class="text-[8px] text-blue-500 font-bold uppercase mb-2">Transferencia Anticipo 50%</p>
                         <div class="flex items-center justify-between bg-white p-3 rounded-xl border border-blue-200">
                             <span id="clabe-text" class="font-mono text-xs font-bold text-slate-700 tracking-tight">722969010024864152</span>
-                            <button onclick="copyClabe()" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-[9px] font-black uppercase active:scale-95 transition-all">COPIAR</button>
+                            <button onclick="copyClabe()" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-[9px] font-black uppercase hover:bg-blue-700 transition-all">COPIAR</button>
                         </div>
                         <p id="copy-status" class="text-[9px] text-blue-500 mt-2 font-bold hidden uppercase tracking-widest">¡CLABE COPIADA!</p>
                     </div>
@@ -81,6 +81,7 @@
         const paymentArea = document.getElementById('payment-area');
         let selectedHour = null;
 
+        // Función para copiar CLABE
         window.copyClabe = () => {
             navigator.clipboard.writeText("722969010024864152").then(() => {
                 const status = document.getElementById('copy-status');
@@ -89,16 +90,18 @@
             });
         };
 
+        // Escuchar cambios en la fecha
         dateInput.onchange = async (e) => {
             const date = e.target.value;
-            hoursGrid.innerHTML = '<p class="text-center col-span-3 text-slate-300 text-[10px] py-2">Buscando...</p>';
+            hoursGrid.innerHTML = '<p class="text-center col-span-3 text-slate-300 text-[10px] py-2">Buscando horarios...</p>';
+            
             const doc = await db.collection('configuracion').doc(date).get();
             const activos = doc.exists ? doc.data().activos : [];
             const snapshot = await db.collection('citas').where('fecha', '==', date).get();
             const ocupadas = snapshot.docs.map(d => d.data().hora);
             const disponibles = activos.filter(h => !ocupadas.includes(h)).sort();
             
-            hoursGrid.innerHTML = disponibles.length ? '' : '<p class="text-center col-span-3 text-red-300 text-[10px] py-2">Sin horarios</p>';
+            hoursGrid.innerHTML = disponibles.length ? '' : '<p class="text-center col-span-3 text-red-300 text-[10px] py-2">Sin horarios disponibles</p>';
             
             disponibles.forEach(hora => {
                 const btn = document.createElement('button');
@@ -108,24 +111,28 @@
                     document.querySelectorAll('#hours-grid button').forEach(b => b.className = 'py-2.5 border rounded-xl text-[10px] font-black border-slate-100 text-slate-500 bg-slate-50');
                     btn.className = 'py-2.5 border rounded-xl text-[10px] font-black bg-slate-900 text-white border-slate-900 shadow-md scale-105';
                     selectedHour = hora;
-                    paymentArea.classList.remove('hidden'); // Muestra el pago al elegir hora
+                    paymentArea.classList.remove('hidden'); // Muestra la CLABE al elegir hora
                 };
                 hoursGrid.appendChild(btn);
             });
         };
 
+        // Función de Agendar
         document.getElementById('submit-btn').onclick = async () => {
             const name = document.getElementById('name').value;
             const phone = document.getElementById('phone').value;
             const date = dateInput.value;
             
-            if(!name || phone.length < 10 || !selectedHour) return alert('Completa todos los campos');
+            if(!name || phone.length < 10 || !selectedHour) {
+                return alert('Por favor, completa tus datos y selecciona un horario.');
+            }
             
             const btn = document.getElementById('submit-btn');
             btn.disabled = true; 
             btn.innerText = "RESERVANDO...";
             
             try {
+                // Guardar en Firebase
                 await db.collection('citas').add({ 
                     nombre: name, 
                     telefono: "52" + phone, 
@@ -133,14 +140,16 @@
                     hora: selectedHour 
                 });
                 
+                // Cambio visual de éxito
                 btn.innerText = "ESPACIO APARTADO";
                 btn.className = "w-full bg-green-500 text-white py-4 rounded-2xl font-black text-sm uppercase shadow-lg";
                 
-                const msj = `Hola Lic. Fernanda, soy ${name}. Aparté mi cita para el ${date} a las ${selectedHour}.`;
-                window.open(`https://wa.me/${FERNANDA_PHONE}?text=${encodeURIComponent(msj)}`, '_blank');
+                // Abrir WhatsApp con el nuevo mensaje personalizado
+                const mensajeWA = `Hola Lic. Fernanda, soy ${name}. Aparté mi cita para el ${date} a las ${selectedHour}. Quedo pendiente en enviar el comprobante de pago, gracias.`;
+                window.open(`https://wa.me/${FERNANDA_PHONE}?text=${encodeURIComponent(mensajeWA)}`, '_blank');
                 
             } catch (error) {
-                alert('Error al agendar.');
+                alert('Error al conectar con la base de datos.');
                 btn.disabled = false;
                 btn.innerText = "CONFIRMAR Y AGENDAR";
             }
